@@ -1,126 +1,93 @@
-jQuery(document).ready(function($) {
+document.addEventListener("DOMContentLoaded", function() {
   "use strict";
 
-  //Contact
-  $('form.php-email-form').submit(function() {
-   
-    var f = $(this).find('.form-group'),
-      ferror = false,
-      emailExp = /^[^\s()<>@,;:\/]+@\w[\w\.-]+\.[a-z]{2,}$/i;
+  const form = document.querySelector(".php-email-form");
 
-    f.children('input').each(function() { // run all inputs
-     
-      var i = $(this); // current input
-      var rule = i.attr('data-rule');
+  if (!form) return;
 
-      if (rule !== undefined) {
-        var ierror = false; // error flag for current input
-        var pos = rule.indexOf(':', 0);
-        if (pos >= 0) {
-          var exp = rule.substr(pos + 1, rule.length);
-          rule = rule.substr(0, pos);
-        } else {
-          rule = rule.substr(pos + 1, rule.length);
-        }
+  form.addEventListener("submit", function(event) {
+    event.preventDefault();
 
-        switch (rule) {
-          case 'required':
-            if (i.val() === '') {
-              ferror = ierror = true;
-            }
-            break;
+    const loading = form.querySelector(".loading");
+    const sent = form.querySelector(".sent-message");
+    const error = form.querySelector(".error-message");
 
-          case 'minlen':
-            if (i.val().length < parseInt(exp)) {
-              ferror = ierror = true;
-            }
-            break;
+    // Reset messages
+    loading.style.display = "none";
+    sent.style.display = "none";
+    error.style.display = "none";
 
-          case 'email':
-            if (!emailExp.test(i.val())) {
-              ferror = ierror = true;
-            }
-            break;
+    // Form validation
+    let ferror = false;
 
-          case 'checked':
-            if (! i.is(':checked')) {
-              ferror = ierror = true;
-            }
-            break;
+    const inputs = form.querySelectorAll("input, textarea");
+    inputs.forEach(input => {
+      const rule = input.getAttribute("data-rule");
+      if (!rule) return;
 
-          case 'regexp':
-            exp = new RegExp(exp);
-            if (!exp.test(i.val())) {
-              ferror = ierror = true;
-            }
-            break;
-        }
-        i.next('.validate').html((ierror ? (i.attr('data-msg') !== undefined ? i.attr('data-msg') : 'wrong Input') : '')).show('blind');
+      let ierror = false;
+      let exp = null;
+      let pos = rule.indexOf(":");
+      let ruleName = rule;
+
+      if (pos >= 0) {
+        exp = rule.substr(pos + 1);
+        ruleName = rule.substr(0, pos);
+      }
+
+      switch (ruleName) {
+        case "required":
+          if (input.value.trim() === "") ierror = true;
+          break;
+        case "minlen":
+          if (input.value.trim().length < parseInt(exp)) ierror = true;
+          break;
+        case "email":
+          const emailExp = /^[^\s()<>@,;:\/]+@\w[\w\.-]+\.[a-z]{2,}$/i;
+          if (!emailExp.test(input.value.trim())) ierror = true;
+          break;
+      }
+
+      // Show error message
+      const msg = input.getAttribute("data-msg") || "Invalid input";
+      const validateEl = input.nextElementSibling;
+      if (ierror) {
+        ferror = true;
+        if (validateEl) validateEl.innerHTML = msg;
+      } else {
+        if (validateEl) validateEl.innerHTML = "";
       }
     });
-    f.children('textarea').each(function() { // run all inputs
 
-      var i = $(this); // current input
-      var rule = i.attr('data-rule');
+    if (ferror) return;
 
-      if (rule !== undefined) {
-        var ierror = false; // error flag for current input
-        var pos = rule.indexOf(':', 0);
-        if (pos >= 0) {
-          var exp = rule.substr(pos + 1, rule.length);
-          rule = rule.substr(0, pos);
+    // Show loading
+    loading.style.display = "block";
+
+    // Submit using fetch
+    const formData = new FormData(form);
+
+    fetch(form.action, {
+      method: form.method,
+      body: formData,
+      headers: { "Accept": "application/json" }
+    })
+      .then(response => {
+        loading.style.display = "none";
+        if (response.ok) {
+          sent.style.display = "block";
+          form.reset();
         } else {
-          rule = rule.substr(pos + 1, rule.length);
+          response.json().then(data => {
+            error.textContent = data.error || "Oops! There was a problem.";
+            error.style.display = "block";
+          });
         }
-
-        switch (rule) {
-          case 'required':
-            if (i.val() === '') {
-              ferror = ierror = true;
-            }
-            break;
-
-          case 'minlen':
-            if (i.val().length < parseInt(exp)) {
-              ferror = ierror = true;
-            }
-            break;
-        }
-        i.next('.validate').html((ierror ? (i.attr('data-msg') != undefined ? i.attr('data-msg') : 'wrong Input') : '')).show('blind');
-      }
-    });
-    if (ferror) return false;
-    else var str = $(this).serialize();
-
-    var this_form = $(this);
-    var action = $(this).attr('action');
-
-    if( ! action ) {
-      this_form.find('.loading').slideUp();
-      this_form.find('.error-message').slideDown().html('The form action property is not set!');
-      return false;
-    }
-    
-    this_form.find('.sent-message').slideUp();
-    this_form.find('.error-message').slideUp();
-    this_form.find('.loading').slideDown();
-    
-    $.ajax({
-      type: "POST",
-      url: action,
-      data: str,
-      success: function(msg) {
-        if (msg == 'OK') {
-          this_form.find('.loading').slideUp();
-          this_form.find('.sent-message').slideDown();
-          this_form.find("input:not(input[type=submit]), textarea").val('');
-        } else {
-          this_form.find('.loading').slideUp();
-          this_form.find('.error-message').slideDown().html(msg);
-        }
-      }
-    });
-    return false;
+      })
+      .catch(() => {
+        loading.style.display = "none";
+        error.textContent = "Oops! There was a problem.";
+        error.style.display = "block";
+      });
   });
-
 });
